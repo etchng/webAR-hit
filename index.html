@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Touch Gestures</title>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <link type="text/css" rel="stylesheet" href="style.css" />
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r126/three.js"
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://unpkg.com/three@0.108.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <style>
+      body {
+        margin: 0;
+        background-color: #000;
+        color: #fff;
+        font-family: Monospace;
+        font-size: 13px;
+        line-height: 24px;
+        overscroll-behavior: none;
+      }
+
+      a {
+        color: #ff0;
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      button {
+        cursor: pointer;
+        text-transform: uppercase;
+      }
+
+      canvas {
+        display: block;
+      }
+
+      #info {
+        position: absolute;
+        top: 0px;
+        width: 100%;
+        padding: 10px;
+        box-sizing: border-box;
+        text-align: center;
+        -moz-user-select: none;
+        -webkit-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        pointer-events: none;
+        z-index: 1; /* TODO Solve this in HTML */
+      }
+
+      a,
+      button,
+      input,
+      select {
+        pointer-events: auto;
+      }
+
+      .dg.ac {
+        -moz-user-select: none;
+        -webkit-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        z-index: 2 !important; /* TODO Solve this in HTML */
+      }
+
+      #overlay {
+        position: absolute;
+        z-index: 2;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.7);
+      }
+
+      #overlay button {
+        background: #ffffff;
+        border: 0;
+        color: #000000;
+        padding: 16px 20px;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      #notSupported {
+        width: 50%;
+        margin: auto;
+        background-color: #f00;
+        margin-top: 20px;
+        padding: 10px;
+      }
+
+      .sidenav {
+        height: 100%;
+        width: 0;
+        position: fixed;
+        z-index: 1;
+        top: 0;
+        left: 0;
+        background-color: #111;
+        overflow-x: hidden;
+        transition: 0.5s;
+        padding-top: 60px;
+      }
+
+      .sidenav a {
+        padding: 8px 8px 8px 32px;
+        text-decoration: none;
+        font-size: 25px;
+        color: #818181;
+        display: block;
+        transition: 0.3s;
+      }
+
+      .sidenav a:hover {
+        color: #f1f1f1;
+      }
+
+      .sidenav .closebtn {
+        position: absolute;
+        top: 0;
+        right: 25px;
+        font-size: 36px;
+        margin-left: 50px;
+      }
+
+      @media screen and (max-height: 450px) {
+        .sidenav {
+          padding-top: 15px;
+        }
+        .sidenav a {
+          font-size: 18px;
+        }
+      }
+
+      #place-button {
+        position: absolute;
+        bottom: 20px;
+        left: calc(50% - 50px);
+        width: 100px;
+        height: 35px;
+        display: none;
+      }
+
+      #VRButton {
+        margin-bottom: 70px !important;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="content">
+      <div id="mySidenav" class="sidenav">
+        <a href="javascript:void(0)" class="closebtn" onclick="closeNav()"
+          >&times;</a
+        >
+        <a class="ar-object" id="1" href="#">item_1</a>
+        <a class="ar-object" id="2" href="#">item_2</a>
+        <a class="ar-object" id="3" href="#">item_3</a>
+        <a class="ar-object" id="4" href="#">item_4</a>
+      </div>
+
+      <div id="container" style="position: fixed;"></div>
+
+      <span
+        style="font-size: 30px; cursor: pointer; position: absolute;"
+        onclick="openNav()"
+        >&#9776; open</span
+      >
+
+      <button type="button" id="place-button">PLACE</button>
+    </div>
+
+    <script>
+      function openNav() {
+        document.getElementById("mySidenav").style.width = "250px";
+      }
+
+      function closeNav() {
+        document.getElementById("mySidenav").style.width = "0";
+      }
+    </script>
+
+    <script type="module">
+      import { ARButton } from "https://unpkg.com/three@0.126.0/examples/jsm/webxr/ARButton.js";
+      let reticle;
+
+      let camera, scene, renderer, model, loader, mixer;
+      const clock = new THREE.Clock();
+      let controller;
+      let modelLoaded = false;
+      let mesh;
+
+      init();
+      // animate();
+
+      function init() {
+        const container = document.createElement("div");
+        document.body.appendChild(container);
+
+        scene = new THREE.Scene();
+
+        camera = new THREE.PerspectiveCamera(
+          70,
+          window.innerWidth / window.innerHeight,
+          0.01,
+          40
+        );
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.xr.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        var light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 10);
+        light.position.set(0.5, 1, 0.25);
+        scene.add(light);
+
+        addReticleToScene(); // circle visual aid
+
+        controller = renderer.xr.getController(0);
+        controller.addEventListener("select", onSelect);
+        scene.add(controller);
+
+        let options = {
+          requiredFeatures: ["hit-test"],
+          optionalFeatures: ["dom-overlay"]
+        };
+
+        options.domOverlay = { root: document.getElementById("content") };
+
+        document.body.appendChild(ARButton.createButton(renderer, options));
+
+        window.addEventListener("resize", onWindowResize, false);
+      }
+
+      function addReticleToScene() {
+        const geometry = new THREE.RingBufferGeometry(0.15, 0.2, 32).rotateX(
+          -Math.PI / 2
+        );
+        const material = new THREE.MeshBasicMaterial();
+
+        reticle = new THREE.Mesh(geometry, material);
+
+        // we will calculate the position and rotation of this reticle every frame manually
+        // in the render() function so matrixAutoUpdate is set to false
+        reticle.matrixAutoUpdate = false;
+        reticle.visible = false; // we start with the reticle not visible
+        scene.add(reticle);
+
+        // optional axis helper you can add to an object
+        // reticle.add(new THREE.AxesHelper(1));
+      }
+
+      // this example is borrowed with slight modifications from three.js samples
+      // https://threejs.org/examples/?q=webxr#webxr_ar_cones
+      function onSelect() {
+        if (reticle.visible) {
+          // const geometry = new THREE.ConeGeometry( 0.1, 0.2, 32 ).rotateX(Math.PI / 2);;
+          const material = new THREE.MeshPhongMaterial({
+            color: 0xffffff * Math.random(),
+            shininess: 6,
+            flatShading: true,
+            transparent: 1,
+            opacity: 0.8
+          });
+          // mesh = new THREE.Mesh(geometry, material);
+
+          const modelUrl =
+            "https://cdn.glitch.global/4b1a3379-352c-450d-b281-51a5cca1b154/eye.glb?v=1650995948521";
+
+          loader = new THREE.GLTFLoader();
+          loader.load(
+            modelUrl,
+            function (gltf) {
+              model = gltf.scene;
+              model.position.z = -10;
+              model.scale.set(0.05, 0.05, 0.05);
+
+              scene.add(model);
+              console.log("Model added to scene");
+
+              modelLoaded = true;
+              model.children[0].traverse((o) => {
+                if (o.isMesh) o.material = material;
+              });
+            },
+            function (xhr) {
+              console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+            },
+            function (error) {
+              console.error(error);
+            }
+          );
+
+          model.position.set(0, 0, -0.3).applyMatrix4(reticle.matrixWorld);
+          model.quaternion.setFromRotationMatrix(reticle.matrixWorld);
+          // model.position.set(0, 0, -0.3).applyMatrix4(controller.matrixWorld);
+          // model.quaternion.setFromRotationMatrix(controller.matrixWorld);
+
+          mixer = new THREE.AnimationMixer(model);
+          mixer.clipAction(gltf.animations[0]).play();
+          animate();
+          scene.add(model);
+        }
+      }
+
+      // function seekAnimationTime(animMixer, timeInSeconds) {
+      //   animMixer.time = 0;
+      //   for (var i = 0; i < animMixer._actions.length; i++) {
+      //     animMixer._actions[i].time = 0;
+      //   }
+      //   animMixer.update(timeInSeconds);
+      // }
+
+      // let animateTrigger = document.querySelector(".ar-object");
+
+      // animateTrigger.addEventListener("click", function () {
+      //   seekAnimationTime(animMixer, 5);
+      // });
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      let hitTestSource = null;
+      let localSpace = null;
+      let hitTestSourceInitialized = false;
+
+      // This function gets called just once to initialize a hitTestSource
+      // The purpose of this function is to get a) a hit test source and b) a reference space
+      async function initializeHitTestSource() {
+        const session = renderer.xr.getSession(); // XRSession
+
+        // Reference spaces express relationships between an origin and the world.
+
+        // For hit testing, we use the "viewer" reference space,
+        // which is based on the device's pose at the time of the hit test.
+        const viewerSpace = await session.requestReferenceSpace("viewer");
+        hitTestSource = await session.requestHitTestSource({
+          space: viewerSpace
+        });
+
+        // We're going to use the reference space of "local" for drawing things.
+        // which gives us stability in terms of the environment.
+        // read more here: https://developer.mozilla.org/en-US/docs/Web/API/XRReferenceSpace
+        localSpace = await session.requestReferenceSpace("local");
+
+        // set this to true so we don't request another hit source for the rest of the session
+        hitTestSourceInitialized = true;
+
+        // In case we close the AR session by hitting the button "End AR"
+        session.addEventListener("end", () => {
+          hitTestSourceInitialized = false;
+          hitTestSource = null;
+        });
+      }
+
+      function animate() {
+        let delta = clock.getDelta();
+        if (modelLoaded) {
+          mixer.update(delta);
+        }
+        renderer.setAnimationLoop(render);
+        requestAnimationFrame(animate);
+      }
+
+      function render(timestamp, frame) {
+        if (frame) {
+          // 1. create a hit test source once and keep it for all the frames
+          // this gets called only once
+          if (!hitTestSourceInitialized) {
+            initializeHitTestSource();
+          }
+
+          // 2. get hit test results
+          if (hitTestSourceInitialized) {
+            // we get the hit test results for a particular frame
+            const hitTestResults = frame.getHitTestResults(hitTestSource);
+
+            // XRHitTestResults The hit test may find multiple surfaces. The first one in the array is the one closest to the camera.
+            if (hitTestResults.length > 0) {
+              const hit = hitTestResults[0];
+              // Get a pose from the hit test result. The pose represents the pose of a point on a surface.
+              const pose = hit.getPose(localSpace);
+
+              reticle.visible = true;
+              // Transform/move the reticle image to the hit test position
+              reticle.matrix.fromArray(pose.transform.matrix);
+            } else {
+              reticle.visible = false;
+            }
+          }
+
+          renderer.render(scene, camera);
+        }
+      }
+      animate();
+    </script>
+  </body>
+</html>
