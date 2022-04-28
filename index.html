@@ -104,8 +104,9 @@
       }
 
       .sidenav {
-        height: 100%;
-        width: 0;
+        display: flex;
+        height: 50px;
+        width: 100%;
         position: fixed;
         z-index: 1;
         top: 0;
@@ -113,20 +114,22 @@
         background-color: #111;
         overflow-x: hidden;
         transition: 0.5s;
-        padding-top: 60px;
+        /* padding: auto; */
+        padding-top: 20px;
       }
 
       .sidenav a {
         padding: 8px 8px 8px 32px;
         text-decoration: none;
         font-size: 25px;
-        color: #818181;
+        color: lightgray;
         display: block;
         transition: 0.3s;
       }
 
       .sidenav a:hover {
-        color: #f1f1f1;
+        color: white;
+        font-weight: bold;
       }
 
       .sidenav .closebtn {
@@ -136,7 +139,33 @@
         font-size: 36px;
         margin-left: 50px;
       }
+      #place-button {
+        position: absolute;
+        bottom: 20px;
+        left: calc(50% - 50px);
+        width: 100px;
+        height: 35px;
+        z-index: 100;
+        /* display: none; */
+      }
 
+      .button-test {
+        position: absolute;
+        display: none;
+        bottom: 100px;
+        border-radius: 25px;
+        left: calc(50% - 50px);
+        width: 100px;
+        height: 50px;
+        background-color: blue;
+      }
+
+      .label {
+        position: absolute;
+        font-size: 24px;
+        color: blue;
+        transition: 0.02s;
+      }
       @media screen and (max-height: 450px) {
         .sidenav {
           padding-top: 15px;
@@ -144,15 +173,6 @@
         .sidenav a {
           font-size: 18px;
         }
-      }
-
-      #place-button {
-        position: absolute;
-        bottom: 20px;
-        left: calc(50% - 50px);
-        width: 100px;
-        height: 35px;
-        display: none;
       }
 
       #VRButton {
@@ -163,28 +183,32 @@
 
   <body>
     <div id="content">
+      <!-- <button type="button" id="place-button">PLACE</button> -->
+      <div class="button-test">
+        <h1>Place</h1>
+      </div>
+
       <div id="mySidenav" class="sidenav">
-        <a href="javascript:void(0)" class="closebtn" onclick="closeNav()"
-          >&times;</a
-        >
-        <a class="ar-object" id="1" href="#">item_1</a>
-        <a class="ar-object" id="2" href="#">item_2</a>
-        <a class="ar-object" id="3" href="#">item_3</a>
-        <a class="ar-object" id="4" href="#">item_4</a>
+        <!-- <a href="javascript:void(0)" class="closebtn" onclick="closeNav()"
+          >&times;</a 
+        >-->
+        <a class="ar-object model1El" id="1" href="#">Healthy</a>
+        <a class="ar-object model2El id="2" href="#">Mild</a>
+        <a class="ar-object model3El" id="3" href="#">Severe</a>
+        <a class="ar-object" id="4" href="#">Treatment</a>
       </div>
 
       <div id="container" style="position: fixed;"></div>
 
-      <span
+      <!-- <span
         style="font-size: 30px; cursor: pointer; position: absolute;"
         onclick="openNav()"
-        >&#9776; open</span
+        >&#9776; Models</span -->
       >
-
-      <button type="button" id="place-button">PLACE</button>
     </div>
+   
 
-    <script>
+    <!-- <script>
       function openNav() {
         document.getElementById("mySidenav").style.width = "250px";
       }
@@ -192,17 +216,52 @@
       function closeNav() {
         document.getElementById("mySidenav").style.width = "0";
       }
-    </script>
+    </script> -->
 
     <script type="module">
       import { ARButton } from "https://unpkg.com/three@0.126.0/examples/jsm/webxr/ARButton.js";
       let reticle;
+      let canvasSize;
+      let placeButton;
 
-      let camera, scene, renderer, model, loader, mixer;
+      let camera, scene, renderer, model, loader, loader2, loader3, mixer;
       const clock = new THREE.Clock();
       let controller;
       let modelLoaded = false;
-      let mesh;
+      let mesh, model1Url, model2Url;
+      let model1Active,
+        model2Active,
+        model3Active = false
+        ;
+let modelArray = [];
+let model1Obj, model2Obj;
+
+      let targetLabel;
+
+
+
+      placeButton = document.querySelector(".button-test");
+
+
+      let model1Tab = document.querySelector(".model1El");
+      model1Tab.addEventListener("click", function () {
+        model1Active = true;
+        model2Active = false;
+        model3Active = false;
+      });
+      let model2Tab = document.querySelector(".model2El");
+      model2Tab.addEventListener("click", function () {
+        model1Active = false;
+        model2Active = true;
+        model3Active = false;
+      });
+      let model3Tab = document.querySelector(".model3El");
+      model3Tab.addEventListener("click", function () {
+        model1Active = false;
+        model2Active = false;
+
+        model3Active = true;
+      });
 
       init();
       // animate();
@@ -226,15 +285,17 @@
         renderer.xr.enabled = true;
         container.appendChild(renderer.domElement);
 
-        var light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 10);
+        var light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1.5);
         light.position.set(0.5, 1, 0.25);
         scene.add(light);
 
         addReticleToScene(); // circle visual aid
 
         controller = renderer.xr.getController(0);
-        controller.addEventListener("select", onSelect);
+        // controller.addEventListener("select", onSelect);
         scene.add(controller);
+
+        placeButton.addEventListener("click", onSelect);
 
         let options = {
           requiredFeatures: ["hit-test"],
@@ -255,6 +316,7 @@
         const material = new THREE.MeshBasicMaterial();
 
         reticle = new THREE.Mesh(geometry, material);
+        model1Active = true;
 
         // we will calculate the position and rotation of this reticle every frame manually
         // in the render() function so matrixAutoUpdate is set to false
@@ -266,6 +328,8 @@
         // reticle.add(new THREE.AxesHelper(1));
       }
 
+
+
       // this example is borrowed with slight modifications from three.js samples
       // https://threejs.org/examples/?q=webxr#webxr_ar_cones
       function onSelect() {
@@ -274,49 +338,122 @@
           const material = new THREE.MeshPhongMaterial({
             color: 0xffffff * Math.random(),
             shininess: 6,
-            flatShading: true,
-            transparent: 1,
-            opacity: 0.8
+            flatShading: false,
+            transparent: 1
+            // opacity: 0.8
           });
           // mesh = new THREE.Mesh(geometry, material);
 
-          const modelUrl =
+          model1Url =
             "https://cdn.glitch.global/4b1a3379-352c-450d-b281-51a5cca1b154/eye.glb?v=1650995948521";
+          model2Url = "/3d/monkey.glb";
 
           loader = new THREE.GLTFLoader();
-          loader.load(
-            modelUrl,
-            function (gltf) {
-              model = gltf.scene;
-              model.position.z = -10;
-              model.scale.set(0.05, 0.05, 0.05);
 
-              scene.add(model);
-              console.log("Model added to scene");
+          if (model1Active) {
+            loader.load(
+              model1Url,
+              function (gltf) {
+                model = gltf.scene;
+                model.name='hero';
+                model.position.z = -10;
+                model.position.y = 10;
+                model.scale.set(0.1, 0.1, 0.1);
 
-              modelLoaded = true;
-              model.children[0].traverse((o) => {
-                if (o.isMesh) o.material = material;
-              });
-            },
-            function (xhr) {
-              console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-            },
-            function (error) {
-              console.error(error);
-            }
-          );
+                model.position
+                  .set(0, 0, -0.3)
+                  .applyMatrix4(reticle.matrixWorld);
+                model.quaternion.setFromRotationMatrix(reticle.matrixWorld);
 
-          model.position.set(0, 0, -0.3).applyMatrix4(reticle.matrixWorld);
-          model.quaternion.setFromRotationMatrix(reticle.matrixWorld);
+                scene.add(model);
+
+                modelArray.push(model);
+                console.log("Model added to scene");
+
+                targetLabel = document.createElement("div");
+                document.getElementById("content").appendChild(targetLabel);
+
+                targetLabel.className = "label";
+                targetLabel.textContent = "Object label";
+                // moveLabel();
+                modelLoaded = true;
+                model.children[0].traverse((o) => {
+                  if (o.isMesh) o.material = material;
+                });
+              },
+              function (xhr) {
+                console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+              },
+              function (error) {
+                console.error(error);
+              }
+            );
+          }
+
+          if (model2Active) {
+            loader.load(
+              model2Url,
+              function (gltf) {
+                model = gltf.scene;
+                model.position.z = -10;
+                model.position.y = 10;
+                model.scale.set(0.1, 0.1, 0.1);
+
+                model.position
+                  .set(0, 0, -0.3)
+                  .applyMatrix4(reticle.matrixWorld);
+                model.quaternion.setFromRotationMatrix(reticle.matrixWorld);
+
+                scene.add(model);
+                console.log("Model added to scene");
+
+                modelLoaded = true;
+                model.children[0].traverse((o) => {
+                  if (o.isMesh) o.material = material;
+                });
+              },
+              function (xhr) {
+                console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+              },
+              function (error) {
+                console.error(error);
+              }
+            );
+          }
+
+          // model.position.set(0, 0, -0.3).applyMatrix4(reticle.matrixWorld);
+          // model.quaternion.setFromRotationMatrix(reticle.matrixWorld);
           // model.position.set(0, 0, -0.3).applyMatrix4(controller.matrixWorld);
           // model.quaternion.setFromRotationMatrix(controller.matrixWorld);
 
-          mixer = new THREE.AnimationMixer(model);
-          mixer.clipAction(gltf.animations[0]).play();
+          // targetLabel.style.right =
+          //   50 - (model.position.x / window.innerWidth) * 100 + "%";
+          // targetLabel.style.top =
+          //   50 - (model.position.y / window.innerHeight) * 100 + "%";
+
+          // mixer = new THREE.AnimationMixer(model);
+          // mixer.clipAction("Action.002").play();
+          // mixer.setTime(20);
+          // scene.add(model);
           animate();
-          scene.add(model);
         }
+      }
+
+      const tempV = new THREE.Vector3();
+
+
+      function moveLabel() {
+ 
+        model.updateWorldMatrix(true, false);
+        model.getWorldPosition(tempV);
+        tempV.project(camera);
+
+        const x = (tempV.x *  .5 + .5) * canvasSize.clientWidth;
+      const y = (tempV.y * -.5 + .5) * canvasSize.clientHeight;
+        console.log(model.position);
+        targetLabel.style.transform = `translate(-50%, -50%) translate(${x}px,${y}px)`;
+
+      
       }
 
       // function seekAnimationTime(animMixer, timeInSeconds) {
@@ -333,9 +470,12 @@
       //   seekAnimationTime(animMixer, 5);
       // });
 
+      // let animateTrigger = document.querySelector(".ar-object");
+
       function onWindowResize() {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
+        canvasSize= renderer.domElement;
 
         renderer.setSize(window.innerWidth, window.innerHeight);
       }
@@ -375,14 +515,30 @@
 
       function animate() {
         let delta = clock.getDelta();
-        if (modelLoaded) {
-          mixer.update(delta);
+        // if (modelLoaded) {
+        //   mixer.update(delta);
+        // }
+        if (model !== undefined) {
+        
+        
+          moveLabel();
         }
         renderer.setAnimationLoop(render);
         requestAnimationFrame(animate);
       }
 
       function render(timestamp, frame) {
+        if (reticle.visible=true) {
+
+placeButton.style.display="block"
+}
+
+if (reticle.visible=false) {
+placeButton.style.display="none"
+
+}
+
+
         if (frame) {
           // 1. create a hit test source once and keep it for all the frames
           // this gets called only once
